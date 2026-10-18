@@ -47,3 +47,8 @@ Thumbs.db
 
 # Local tool caches
 .claude/
+
+# SSH keys and certificates
+*.pem
+*.key
+
