@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+frontend/.next/
+out/
+build/
+dist/
+
+# Python Virtual Environments & Bytecode
+backend/venv/
+venv/
+ENV/
+env/
+__pycache__/
+backend/**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment variables & secrets (NEVER COMMIT SENSITIVE KEYS)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env.local
+frontend/.env*.local
+!.env.example
+!*.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Local tool caches
+.claude/
