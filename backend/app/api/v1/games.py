@@ -433,17 +433,41 @@ def create_mines_session(
     if payload.mine_count >= total_cells:
         raise HTTPException(status_code=422, detail="Mine count must be less than total cells")
 
-    # Get Mines game and current config
+    # Get Mines game and current config (auto-create if not yet seeded)
     game = db.scalar(select(Game).where(Game.type == GameType.MINES))
     if game is None:
-        raise HTTPException(status_code=404, detail="Mines game not found")
+        game = Game(
+            id=uuid4(),
+            type=GameType.MINES,
+            name="Mines",
+            status=GameStatus.ACTIVE,
+            description="Uncover gems and avoid mines to multiply your virtual credits.",
+            current_config_version=1,
+        )
+        db.add(game)
+        db.commit()
+
     config = db.scalar(
         select(GameConfiguration).where(
             GameConfiguration.game_id == game.id, GameConfiguration.version == game.current_config_version
         )
     )
     if config is None:
-        raise HTTPException(status_code=500, detail="Game configuration not found")
+        config = GameConfiguration(
+            id=uuid4(),
+            game_id=game.id,
+            version=1,
+            configuration={
+                "house_edge_bps": 200,
+                "min_wager": 10,
+                "max_wager": 100_000,
+            },
+            effective_at=func.now(),
+            created_by=current_user.id,
+            change_reason="Initial Mines configuration",
+        )
+        db.add(config)
+        db.commit()
 
     # Create seed commitment
     commitment = create_seed_commitment()

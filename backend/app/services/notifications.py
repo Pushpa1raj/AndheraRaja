@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ def create_notification(
     reference_id: UUID | None = None,
 ) -> Notification:
     notification = Notification(
+        id=uuid4(),
         user_id=user_id,
         type=notification_type,
         title=title,

@@ -39,7 +39,7 @@ class CreditTransaction(Base):
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    type: Mapped[TransactionType] = mapped_column(Enum(TransactionType, name="transaction_type", create_type=False), nullable=False)
+    type: Mapped[TransactionType] = mapped_column(Enum(TransactionType, name="transaction_type", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     balance_before: Mapped[int] = mapped_column(BigInteger, nullable=False)
     balance_after: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -56,7 +56,7 @@ class CreditRequest(Base):
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     requested_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     approved_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    status: Mapped[CreditRequestStatus] = mapped_column(Enum(CreditRequestStatus, name="credit_request_status", create_type=False), nullable=False)
+    status: Mapped[CreditRequestStatus] = mapped_column(Enum(CreditRequestStatus, name="credit_request_status", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
@@ -19,7 +20,7 @@ class UserUpdate(BaseModel):
 
 
 class User(UserBase):
-    id: str
+    id: UUID
     avatar_url: Optional[str] = None
     role: UserRole
     status: UserStatus
