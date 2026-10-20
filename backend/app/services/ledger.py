@@ -37,7 +37,7 @@ def apply_transaction(
         result = db.execute(
             text(
                 "select * from public.apply_credit_transaction("
-                ":user_id, :transaction_type, :amount, :reference_type, :reference_id, :reason)"
+                ":user_id, :transaction_type::public.transaction_type, :amount, :reference_type, :reference_id, :reason)"
             ),
             {
                 "user_id": user_id,

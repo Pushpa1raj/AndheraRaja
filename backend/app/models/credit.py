@@ -1,5 +1,5 @@
 import enum
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -37,7 +37,7 @@ class CreditAccount(Base):
 class CreditTransaction(Base):
     __tablename__ = "credit_transactions"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     type: Mapped[TransactionType] = mapped_column(Enum(TransactionType, name="transaction_type", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -52,7 +52,7 @@ class CreditTransaction(Base):
 class CreditRequest(Base):
     __tablename__ = "credit_requests"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     requested_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     approved_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

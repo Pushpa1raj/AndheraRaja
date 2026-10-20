@@ -133,9 +133,14 @@ def get_current_aviator_round(
             AviatorRound.crash_at <= now,
         )
     ).all()
+    fernet = Fernet(settings.ENCRYPTION_KEY.encode())
     for r in running_rounds:
         r.status = AviatorRoundStatus.CRASHED
         r.settled_at = now
+        try:
+            r.revealed_server_seed = fernet.decrypt(bytes(r.encrypted_server_seed)).decode("utf-8")
+        except Exception:
+            r.revealed_server_seed = "00000000000000000000000000000000"
         # Settle any active placed bets on this round as lost
         bets = db.scalars(
             select(AviatorBet).where(

@@ -1,5 +1,5 @@
 import enum
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, LargeBinary, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PG_UUID
@@ -44,7 +44,7 @@ class MinesSessionStatus(str, enum.Enum):
 class Game(Base):
     __tablename__ = "games"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     type: Mapped[GameType] = mapped_column(Enum(GameType, name="game_type", create_type=False, values_callable=lambda x: [e.value for e in x]), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[GameStatus] = mapped_column(Enum(GameStatus, name="game_status", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
@@ -57,7 +57,7 @@ class Game(Base):
 class GameConfiguration(Base):
     __tablename__ = "game_configurations"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     game_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     configuration: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -70,7 +70,7 @@ class GameConfiguration(Base):
 class AviatorRound(Base):
     __tablename__ = "aviator_rounds"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     game_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
     configuration_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("game_configurations.id"), nullable=False)
     status: Mapped[AviatorRoundStatus] = mapped_column(Enum(AviatorRoundStatus, name="aviator_round_status", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False)
@@ -92,7 +92,7 @@ class AviatorRound(Base):
 class AviatorBet(Base):
     __tablename__ = "aviator_bets"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     round_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("aviator_rounds.id"), nullable=False)
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     wager_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -108,7 +108,7 @@ class AviatorBet(Base):
 class MinesSession(Base):
     __tablename__ = "mines_sessions"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     game_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("games.id"), nullable=False)
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     configuration_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("game_configurations.id"), nullable=False)

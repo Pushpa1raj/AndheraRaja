@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ def record_audit(
     new_state: dict | None = None,
 ) -> AuditLog:
     event = AuditLog(
+        id=uuid4(),
         administrator_id=administrator_id,
         action=action,
         target_type=target_type,
