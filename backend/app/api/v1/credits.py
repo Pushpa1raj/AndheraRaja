@@ -35,7 +35,14 @@ def get_credit_balance(
 ):
     account = db.get(CreditAccount, current_user.id)
     if account is None:
-        raise HTTPException(status_code=404, detail="Credit account not found")
+        account = CreditAccount(
+            user_id=current_user.id,
+            balance=1000,
+            version=1,
+        )
+        db.add(account)
+        db.commit()
+        db.refresh(account)
     return account
 
 

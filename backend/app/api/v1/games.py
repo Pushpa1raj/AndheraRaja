@@ -105,17 +105,134 @@ def get_current_aviator_round(
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get the current or upcoming Aviator round."""
+    """Get the current or upcoming Aviator round, auto-advancing expired rounds."""
+    import math
+    import secrets
+    from datetime import datetime, timedelta, timezone
+
     game = db.scalar(select(Game).where(Game.type == GameType.AVIATOR))
     if game is None:
-        raise HTTPException(status_code=404, detail="Aviator game not found")
+        game = Game(
+            id=uuid4(),
+            type=GameType.AVIATOR,
+            name="Aviator",
+            status=GameStatus.ACTIVE,
+            description="Cash out virtual credits before the flight crashes.",
+            current_config_version=1,
+        )
+        db.add(game)
+        db.commit()
 
+    now = datetime.now(timezone.utc)
+
+    # 1. Check for running rounds that have reached their crash_at
+    running_rounds = db.scalars(
+        select(AviatorRound).where(
+            AviatorRound.game_id == game.id,
+            AviatorRound.status == AviatorRoundStatus.RUNNING,
+            AviatorRound.crash_at <= now,
+        )
+    ).all()
+    for r in running_rounds:
+        r.status = AviatorRoundStatus.CRASHED
+        r.settled_at = now
+        # Settle any active placed bets on this round as lost
+        bets = db.scalars(
+            select(AviatorBet).where(
+                AviatorBet.round_id == r.id,
+                AviatorBet.status == BetStatus.PLACED,
+            )
+        ).all()
+        for b in bets:
+            b.status = BetStatus.LOST
+            b.settled_at = now
+    if running_rounds:
+        db.commit()
+
+    # 2. Check for waiting rounds whose betting window has elapsed
+    waiting_rounds = db.scalars(
+        select(AviatorRound).where(
+            AviatorRound.game_id == game.id,
+            AviatorRound.status == AviatorRoundStatus.WAITING,
+            AviatorRound.starts_at <= now,
+        )
+    ).all()
+    for r in waiting_rounds:
+        r.status = AviatorRoundStatus.RUNNING
+    if waiting_rounds:
+        db.commit()
+
+    # 3. Retrieve the latest active (waiting or running) round
     round = db.scalar(
         select(AviatorRound)
-        .where(AviatorRound.game_id == game.id, AviatorRound.status.in_(["waiting", "running"]))
+        .where(
+            AviatorRound.game_id == game.id,
+            AviatorRound.status.in_([AviatorRoundStatus.WAITING, AviatorRoundStatus.RUNNING]),
+        )
         .order_by(AviatorRound.starts_at.desc())
         .limit(1)
     )
+
+    # 4. If no round exists, or all are crashed, generate the next waiting round
+    if round is None:
+        config = db.scalar(
+            select(GameConfiguration).where(
+                GameConfiguration.game_id == game.id,
+                GameConfiguration.version == game.current_config_version,
+            )
+        )
+        if config is None:
+            config = GameConfiguration(
+                id=uuid4(),
+                game_id=game.id,
+                version=1,
+                configuration={
+                    "growth_rate_bps": 600,
+                    "max_multiplier_bps": 100_000,
+                    "min_wager": 10,
+                    "max_wager": 100_000,
+                },
+                effective_at=now,
+                created_by=current_user.id,
+                change_reason="Initial seed configuration",
+            )
+            db.add(config)
+            db.commit()
+
+        commitment = create_seed_commitment()
+        fernet = Fernet(settings.ENCRYPTION_KEY.encode())
+        encrypted_seed = fernet.encrypt(commitment.server_seed.encode("utf-8"))
+        round_id = uuid4()
+        client_nonce = secrets.token_hex(8)
+        multiplier_bps = aviator_crash_multiplier_bps(
+            commitment.server_seed, round_id, client_nonce, 100_000
+        )
+
+        # Calculate flight duration: logarithmic curve (min 4s, up to 45s)
+        mult_float = max(1.01, multiplier_bps / 10_000.0)
+        flight_seconds = min(45, max(4, int(math.log(mult_float) * 7) + 3))
+        starts_at = now + timedelta(seconds=7)  # 7-second countdown for placing bets
+        betting_closes_at = starts_at
+        crash_at = starts_at + timedelta(seconds=flight_seconds)
+
+        round = AviatorRound(
+            id=round_id,
+            game_id=game.id,
+            configuration_id=config.id,
+            status=AviatorRoundStatus.WAITING,
+            starts_at=starts_at,
+            betting_closes_at=betting_closes_at,
+            crash_at=crash_at,
+            server_seed_hash=commitment.server_seed_hash,
+            encrypted_server_seed=encrypted_seed,
+            client_nonce=client_nonce,
+            fairness_algorithm="hmac-sha256-v1",
+            crash_multiplier_bps=multiplier_bps,
+        )
+        db.add(round)
+        db.commit()
+        db.refresh(round)
+
     return round
 
 
@@ -247,9 +364,17 @@ def cashout_aviator_bet(
     if func.now() >= round.crash_at:
         raise HTTPException(status_code=409, detail="Round has already crashed")
 
-    # Calculate elapsed multiplier (simplified: use a fixed 2x for now)
-    # In production, compute from elapsed time and configured growth rate
-    cashout_multiplier_bps = 20_000  # 2.00x
+    # Calculate elapsed multiplier dynamically based on elapsed flight time
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    # Ensure round.starts_at is timezone-aware
+    starts = round.starts_at if round.starts_at.tzinfo else round.starts_at.replace(tzinfo=timezone.utc)
+    elapsed = max(0.0, (now - starts).total_seconds())
+    # Dynamic flight curve: exponential growth starting at 1.00x
+    dynamic_mult = 1.0 + 0.08 * elapsed + 0.012 * (elapsed ** 2)
+    calculated_bps = int(dynamic_mult * 10_000)
+    # Never exceed the committed crash multiplier
+    cashout_multiplier_bps = min(round.crash_multiplier_bps, max(10_100, calculated_bps))
     payout_amount = payout_credits(bet.wager_amount, cashout_multiplier_bps)
 
     # Credit the payout

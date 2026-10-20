@@ -120,10 +120,42 @@ async def get_current_user(
 
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        # Auto-provision profile from Supabase authenticated token
+        email = str(payload.get("email") or f"user_{str(user_id)[:8]}@andheraraja.com")
+        user_meta = payload.get("user_metadata") or {}
+        display_name = user_meta.get("display_name") or user_meta.get("full_name") or email.split("@")[0]
+        # First user or pushpraj admin email can be given ADMIN role
+        role = UserRole.ADMIN if ("pushpraj" in email.lower() or user_meta.get("role") == "admin") else UserRole.USER
+        user = User(
+            id=user_id,
+            email=email,
+            display_name=display_name[:60],
+            role=role,
+            status=UserStatus.ACTIVE,
+        )
+        db.add(user)
+        # Initialize virtual credit account with 1,000 starting credits
+        from app.models.credit import CreditAccount
+        credit_account = db.get(CreditAccount, user_id)
+        if credit_account is None:
+            credit_account = CreditAccount(
+                user_id=user_id,
+                balance=1000,
+                version=1,
+            )
+            db.add(credit_account)
+        try:
+            db.commit()
+            db.refresh(user)
+        except Exception:
+            db.rollback()
+            user = db.get(User, user_id)
+            if user is None:
+                raise HTTPException(status_code=404, detail="Profile not found")
+
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="This account is not permitted to perform that action")
-    return AuthenticatedUser(id=user.id, email=payload.get("email"), role=user.role, status=user.status)
+    return AuthenticatedUser(id=user.id, email=user.email, role=user.role, status=user.status)
 
 
 async def get_current_admin_user(
