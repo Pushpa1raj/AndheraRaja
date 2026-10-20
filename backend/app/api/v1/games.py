@@ -386,7 +386,7 @@ def cashout_aviator_bet(
     payout_transaction = apply_transaction(
         db,
         user_id=current_user.id,
-        transaction_type=TransactionType.GAME_PAYOUT,
+        transaction_type=TransactionType.GAME_WIN,
         amount=payout_amount,
         reference_type="aviator_bet",
         reference_id=bet.id,
@@ -636,7 +636,7 @@ def cashout_mines_session(
     payout_transaction = apply_transaction(
         db,
         user_id=current_user.id,
-        transaction_type=TransactionType.GAME_PAYOUT,
+        transaction_type=TransactionType.GAME_WIN,
         amount=payout_amount,
         reference_type="mines_session",
         reference_id=session.id,
